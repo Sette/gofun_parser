@@ -1,5 +1,8 @@
 import csv
-
+import re
+from collections import defaultdict
+from tqdm.notebook import tqdm
+import pandas as pd
 
 class GoFunCSVParser:
     def __init__(self, input_file, output_file):
@@ -12,7 +15,8 @@ class GoFunCSVParser:
         """
         self.input_file = input_file
         self.output_file = output_file
-        self.attributes = []
+        self.atributes_names = []
+        self.processed_lines = []
         self.data = []
 
     def load_data(self):
@@ -22,42 +26,89 @@ class GoFunCSVParser:
         with open(self.input_file, 'r') as file:
             self.data = file.readlines()
 
-    def parse_attributes(self):
-        """
-        Parse the attribute line to extract class hierarchy information.
+    def __process_line(self, line, is_data=False):
+        if is_data:
+            feature_data = line.strip().split(",")
+            return {'features': feature_data}
+            
+        if line.startswith("@ATTRIBUTE class"):
+            # Parse attribute information after "@ATTRIBUTE class"
+            hierarchy_data = line.split(maxsplit=2)[2]
+            labels = hierarchy_data.strip().split(",")
+            labels[0] = labels[0].split(' ')[1]
+            return {'labels': labels}
+            # Process only @ATTRIBUTE lines for potential issues
+        elif line.startswith("@ATTRIBUTE"):
+            parts = line.split(maxsplit=2)  # Split only the first two parts
+            if len(parts) < 3:
+                print(f"Warning: Skipping malformed attribute line: {line.strip()}")
+    
+            attribute_name = parts[1]
+    
+            # Replace special characters in attribute names with underscores
+            attribute_name = re.sub(r'[^a-zA-Z0-9_]', '_', attribute_name)
+    
+            return attribute_name
+        elif line.startswith("@DATA"):
+            # Parse attribute information after "@ATTRIBUTE class"
+            data = line.split(maxsplit=2)
+            return {'data': data}
 
-        Returns:
-            list: Parsed hierarchy structure as a list.
-        """
-        for line in self.data:
-            if line.startswith("@ATTRIBUTE class"):
-                hierarchy_data = line.split()[2:]  # Adjust based on the file format
-                self.attributes = hierarchy_data[0].split(",")
-                break
 
-    def transform_to_csv_format(self):
+    def preprocess(self):
         """
-        Transform hierarchical data to CSV format and save it to the output file.
-        """
-        csv_data = []
-        csv_data.append(self.attributes)  # Add attributes as headers
-        # Example transformation: Adjust this based on your specific needs
-        for line in self.data:
-            if not line.startswith("@"):
-                # Process each line to extract values based on hierarchy
-                csv_row = line.strip().split()  # Adjust based on file format
-                csv_data.append(csv_row)
+        Temporarily preprocesses the .arff file to fix issues with attribute format and duplicate attribute names.
 
-        # Save the transformed data to CSV
-        with open(self.output_file, 'w', newline='') as csvfile:
-            writer = csv.writer(csvfile)
-            writer.writerows(csv_data)
+        :param arff_file_path: Path to the .arff file
+        :return: Path to the temporary .arff file
+        """
+        with open(self.input_file, 'r') as file:
+            lines = [line.strip() for line in file.readlines() if line.strip()]
+
+        is_data = False
+        for line in tqdm(lines):
+            line = self.__process_line(line, is_data=is_data)
+            if line != ' ' and line != None:
+                if type(line) != dict:
+                    self.atributes_names.append(line)
+                else:
+                    if 'data' in line.keys():
+                        is_data = True
+                    else:
+                        self.processed_lines.append(line)
+
+    def transform_to_csv(self):
+        temp_example = []
+        separated_examples = []
+        for line in self.processed_lines:
+            if 'features' in line.keys():
+                for feature in line['features']:
+                    temp_example.append(feature)
+                    # Verifique se é o final de um exemplo com base no padrão categórico
+                    if "@" in feature:  # Ajuste esta condição conforme necessário para seu padrão
+                        separated_examples.append(temp_example)
+                        temp_example = []
+        # Criar listas para armazenar os dados
+        features = []
+        categories = []
+        
+        # Separar features e categorias
+        for example in tqdm(separated_examples):
+            features.append([int(x) for x in example[:-1]])  # Converter features para inteiros
+            categories.append(example[-1])  # Manter categorias como strings
+
+        # Criar o DataFrame
+        df = pd.DataFrame(features, columns=self.atributes_names)
+        df["Categories"] = categories  # Adicionar a coluna de categorias
+        
+        # Visualizar o DataFrame
+        df.to_csv(self.output_file, index=False)
 
     def process(self):
         """
         Full process: load data, parse attributes, and transform to CSV format.
         """
         self.load_data()
-        attributes = self.parse_attributes()
-        self.transform_to_csv_format()
+        self.preprocess()
+        self.transform_to_csv()
         print(f"Data successfully converted and saved to {self.output_file}")

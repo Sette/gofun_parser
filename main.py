@@ -2,9 +2,7 @@ import os
 from ast import parse
 
 import pandas as pd
-import arff  # from liac-arff
 import zipfile
-from scipy.io import arff as scipyarff
 import re
 
 from gofun_parser import GoFunCSVParser
@@ -35,6 +33,8 @@ def extract_all_zips(input_dir, output_dir):
                 zip_ref.extractall(extract_folder)
 
             print(f"Extracted {file_name} to {extract_folder}")
+            os.remove(zip_path)
+            print(f"Removed {file_name}")
 
 
 def extract_specific_zips(input_path, output_dir):
@@ -59,49 +59,9 @@ def extract_specific_zips(input_path, output_dir):
                     zip_ref.extractall(extract_folder)
 
                 print(f"Extracted {file_name} from {root} to {extract_folder}")
+                os.remove(zip_path)
+                print(f"Removed {file_name}")
 
-
-
-def arff_to_csv_scipy(arff_file_path, csv_file_path):
-    """
-    Converts an .arff file to .csv format using scipy.io.arff.
-
-    :param arff_file_path: Path to the .arff file
-    :param csv_file_path: Path to save the .csv file
-    """
-    data, meta = scipyarff.loadarff(arff_file_path)
-    df = pd.DataFrame(data)
-    df.to_csv(csv_file_path, index=False)
-    print(f"Converted {arff_file_path} to {csv_file_path}")
-
-def arff_to_csv_liac(arff_file_path, csv_file_path):
-    """
-    Converts an .arff file to .csv format using liac-arff.
-
-    :param arff_file_path: Path to the .arff file
-    :param csv_file_path: Path to save the .csv file
-    """
-    # Load the .arff file using liac-arff
-    with open(arff_file_path, 'r') as f:
-        data = arff.load(f)
-    print(data)
-
-    # Convert to pandas DataFrame
-    #df = pd.DataFrame(data['data'], columns=[attr[0] for attr in data['attributes']])
-
-    # Save as .csv
-    #df.to_csv(csv_file_path, index=False)
-    #print(f"Converted {arff_file_path} to {csv_file_path}")
-
-
-def convert_arffs_to_csvs(output_dir):
-    for root, dirs, files in os.walk(output_dir):
-        for file in files:
-            if file.endswith('.arff'):
-                arff_file_path = os.path.join(root, file)
-                csv_file_path = os.path.splitext(arff_file_path)[0] + '.csv'
-                arff_to_csv_liac(arff_file_path, csv_file_path)
-                #arff_to_csv_scipy(arff_file_path, csv_file_path)
 
 
 def __process_line(line):
@@ -156,25 +116,23 @@ def preprocess_arff_file(arff_file_path):
     return processed_lines
 
 # Example usage
-input_dir = r'C:\Users\bruno\storage\GO'  # Directory containing the .zip files
-extracted_dir = r'C:\Users\bruno\storage\GO_extraced'  # Directory to save the extracted files
+input_dir = '/home/brunosilvasette/storage/FUN'  # Directory containing the .zip files
+extracted_dir = '/home/brunosilvasette/storage/FUN_extraced'  # Directory to save the extracted files
 
 
 if __name__ == "__main__":
     input_dir = extracted_dir
 
-    output_dir = r'C:\Users\bruno\storage\GO_csv'
-    arff_file_path = r'C:\Users\bruno\storage\GO_extraced\expr_GO\datasets_GO\expr_GO\expr_GO.test.arff\expr_GO.test.arff'
-    arff_file_path_parsed = r'C:\Users\bruno\storage\GO_extraced\expr_GO\datasets_GO\expr_GO\expr_GO.test.arff\expr_GO.test.csv'
+    output_dir = '/home/brunosilvasette/storage/FUN_csv'
 
     #parser = GoFunCSVParser(arff_file_path, arff_file_path_parsed)
     #parser.process()
 
-    extract_all_zips(input_dir, output_dir)
-    #extract_specific_zips(extracted_dir, extracted_dir)
+    #extract_all_zips(input_dir, extracted_dir)
+    extract_specific_zips(extracted_dir, extracted_dir)
     # Step 2: Convert .arff files to .csv
 
-    preprocess_arff_file(arff_file_path)
+    #preprocess_arff_file(arff_file_path)
 
     #with open(arff_file_path+'.temp', 'r') as f:
     #    data = arff.load(f)
