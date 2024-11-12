@@ -46,7 +46,7 @@ class GoFunCSVParser:
             attribute_name = parts[1]
     
             # Replace special characters in attribute names with underscores
-            attribute_name = re.sub(r'[^a-zA-Z0-9_]', '_', attribute_name)
+            #attribute_name = re.sub(r'[^a-zA-Z0-9_]', '_', attribute_name)
     
             return attribute_name
         elif line.startswith("@DATA"):
@@ -66,7 +66,7 @@ class GoFunCSVParser:
             lines = [line.strip() for line in file.readlines() if line.strip()]
 
         is_data = False
-        for line in tqdm(lines):
+        for line in lines:
             line = self.__process_line(line, is_data=is_data)
             if line != ' ' and line != None:
                 if type(line) != dict:
@@ -91,10 +91,20 @@ class GoFunCSVParser:
         # Criar listas para armazenar os dados
         features = []
         categories = []
-        
+
         # Separar features e categorias
-        for example in tqdm(separated_examples):
-            features.append([int(x) for x in example[:-1]])  # Converter features para inteiros
+        for example in separated_examples:
+            local_features = []
+            for feature in example[:-1]:
+                try:
+                    x = float(feature)
+                except:
+                    if feature == '?':
+                        x = None
+                    else:
+                        x = feature
+                local_features.append(x)
+            features.append(local_features)  # Converter features para inteiros
             categories.append(example[-1])  # Manter categorias como strings
 
         # Criar o DataFrame
@@ -108,6 +118,7 @@ class GoFunCSVParser:
         """
         Full process: load data, parse attributes, and transform to CSV format.
         """
+        
         self.load_data()
         self.preprocess()
         self.transform_to_csv()
