@@ -1,9 +1,8 @@
-import csv
-import re
+import json
 from collections import defaultdict
 from tqdm.notebook import tqdm
 import pandas as pd
-import numpy as np
+import os
 
 class GoFunCSVParser:
     def __init__(self, input_file, output_file):
@@ -16,7 +15,8 @@ class GoFunCSVParser:
         """
         self.input_file = input_file
         self.output_file = output_file
-        self.atributes_names = []
+        self.output_atributes_file = output_file.replace('.csv','.json')
+        self.atributes_names = {'name': [], 'type': []}
         self.processed_lines = []
         self.lines = []
 
@@ -66,7 +66,8 @@ class GoFunCSVParser:
             if type(line) is tuple:
                 f_name, f_type = line
                 if f_name != ' ' and f_name != None:
-                    self.atributes_names.append((f_name, f_type))
+                    self.atributes_names['name'].append(f_name)
+                    self.atributes_names['type'].append(f_type)
             elif type(line) == dict:
                 if 'data' in line.keys():
                     is_data = True
@@ -79,6 +80,16 @@ class GoFunCSVParser:
         df.features = df.features.apply(lambda List: [None if x == '?' else x for x in List])
         # Save dataframe to CSV
         df.to_csv(self.output_file, index=False)
+
+        # Convert person dictionary to JSON
+        atributes_names = json.dumps(self.atributes_names, indent=4)  
+        
+        # Check if the file already exists
+        if not os.path.exists(self.output_atributes_file):
+            with open(self.output_atributes_file, 'w') as fp:
+                json.dump(atributes_names, fp)
+        else:
+            print(f"The file '{self.output_atributes_file}' already exists and will not be overwritten.")
 
     def process(self):
         """
