@@ -4,7 +4,7 @@ GoFun Parser is a tool for converting ARFF files from hierarchical datasets of g
 
 ## Overview
 
-The project primarily focuses on converting ARFF files available from the [CLUJ HMC Datasets](https://dtai.cs.kuleuven.be/software/clus/hmcdatasets/) into CSV files. This conversion ensures that researchers and practitioners in fields such as bioinformatics and hierarchical multi-label classification can seamlessly use these datasets with a wide range of modern data processing tools and frameworks.
+The project primarily focuses on converting ARFF files available from the [HMC Datasets](https://dtai.cs.kuleuven.be/software/clus/hmcdatasets/) into CSV files. This conversion ensures that researchers and practitioners in fields such as bioinformatics and hierarchical multi-label classification can seamlessly use these datasets with a wide range of modern data processing tools and frameworks.
 
 ## Features
 
