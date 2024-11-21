@@ -1,6 +1,4 @@
 import json
-from collections import defaultdict
-from tqdm.notebook import tqdm
 import pandas as pd
 import os
 
@@ -15,9 +13,17 @@ class GoFunCSVParser:
         """
         self.input_file = input_file
         self.output_file = output_file
-        self.output_atributes_file = output_file.replace('.csv','.json')
+        if 'train' in output_file:
+            self.output_atributes_file = output_file.replace('.train', '')
+        elif 'test' in output_file:
+            self.output_atributes_file = output_file.replace('.test', '')
+        else:
+            self.output_atributes_file = output_file.replace('.valid', '')
+        self.output_atributes_file = self.output_atributes_file.replace('.csv','.json')
+        self.output_labels_file = self.output_atributes_file.replace('.json', '-labels.json')
         self.atributes_names = {'name': [], 'type': []}
         self.processed_lines = []
+        self.labels = {'labels': []}
         self.lines = []
 
     def load_data(self):
@@ -40,7 +46,7 @@ class GoFunCSVParser:
                 hierarchy_data = line.split(maxsplit=2)[2]
                 labels = hierarchy_data.strip().split(",")
                 labels[0] = labels[0].split(' ')[1]
-                return {'labels': labels}
+                return labels
                 # Process only @ATTRIBUTE lines for potential issues
             else:
                 _, f_name, f_type = line.split()
@@ -71,7 +77,9 @@ class GoFunCSVParser:
             elif type(line) == dict:
                 if 'data' in line.keys():
                     is_data = True
-                elif 'labels' not in line.keys():
+                elif 'labels' in line.keys():
+                    self.labels['labels'].append(line)
+                else:
                     self.processed_lines.append(line)
 
     def transform_to_csv(self):
@@ -81,13 +89,17 @@ class GoFunCSVParser:
         # Save dataframe to CSV
         df.to_csv(self.output_file, index=False)
 
-        # Convert person dictionary to JSON
-        atributes_names = json.dumps(self.atributes_names, indent=4)  
+        # Check if the file already exists
+        if not os.path.exists(self.output_labels_file):
+            with open(self.output_labels_file, 'w') as fp:
+                json.dump(self.labels, fp)
+        else:
+            print(f"The file '{self.output_labels_file}' already exists and will not be overwritten.")
         
         # Check if the file already exists
         if not os.path.exists(self.output_atributes_file):
             with open(self.output_atributes_file, 'w') as fp:
-                json.dump(atributes_names, fp)
+                json.dump(self.atributes_names, fp)
         else:
             print(f"The file '{self.output_atributes_file}' already exists and will not be overwritten.")
 
