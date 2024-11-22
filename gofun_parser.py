@@ -23,7 +23,6 @@ class GoFunCSVParser:
         self.output_labels_file = self.output_atributes_file.replace('.json', '-labels.json')
         self.atributes_names = {'name': [], 'type': []}
         self.processed_lines = []
-        self.labels = {'labels': []}
         self.lines = []
 
     def load_data(self):
@@ -46,7 +45,7 @@ class GoFunCSVParser:
                 hierarchy_data = line.split(maxsplit=2)[2]
                 labels = hierarchy_data.strip().split(",")
                 labels[0] = labels[0].split(' ')[1]
-                return labels
+                return {'labels': labels}
                 # Process only @ATTRIBUTE lines for potential issues
             else:
                 _, f_name, f_type = line.split()
@@ -78,12 +77,11 @@ class GoFunCSVParser:
                 if 'data' in line.keys():
                     is_data = True
                 elif 'labels' in line.keys():
-                    self.labels['labels'].append(line)
+                    self.labels = line
                 else:
                     self.processed_lines.append(line)
 
     def transform_to_csv(self):
-
         df = pd.DataFrame(self.processed_lines)
         df.features = df.features.apply(lambda List: [None if x == '?' else x for x in List])
         # Save dataframe to CSV
