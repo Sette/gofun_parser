@@ -153,22 +153,55 @@ def load_dataset_paths(fun_path, go_path):
 
 
 class Dataset:
-    def __init__(self, csv_file, labels_json, hierarchy_json=None, is_GO=False, is_test=False):
+    def __init__(self, csv_file, labels_json, is_go=False, is_test=False):
         """
         Initializes the dataset, loading features (X), labels (Y), and optionally the hierarchy graph.
         """
-        self.X, self.Y, self.terms, self.g = self.load_data(
-            csv_file, labels_json, hierarchy_json, is_GO, is_test
+
+        self.g = None
+        self.nodes_idx = None
+        self.g_t = None
+        self.graph_path = labels_json.replace('-labels.json', '.graphml')
+        self.load_structure(labels_json, is_go)
+
+        #self.X, self.Y = self.load_data(
+        #    csv_file, hierarchy_json, is_go, is_test
+        #)
+        #self.to_eval = [t not in to_skip for t in self.terms]
+
+
+    def load_structure(self, labels_json, is_go):
+        # Load labels JSON
+        with open(labels_json, 'r') as f:
+            categories = json.load(f)
+
+        self.g = nx.DiGraph()
+
+        for cat in categories['labels']:
+            terms = cat.split('/')
+            if is_go:
+                self.g.add_edge(terms[1], terms[0])
+            else:
+                if len(terms) == 1:
+                    self.g.add_edge(terms[0], 'root')
+                else:
+                    for i in range(2, len(terms) + 1):
+                        self.g.add_edge('.'.join(terms[:i]), '.'.join(terms[:i - 1]))
+
+
+        ### Save networkx graph
+        # Para salvar em formato GraphML
+        nx.write_graphml(self.g, self.graph_path)
+
+        nodes = sorted(self.g.nodes(),
+                key=lambda x: (nx.shortest_path_length(self.g, x, 'root'), x) if is_go else (len(x.split('.')), x)
         )
-        self.to_eval = [t not in to_skip for t in self.terms]
+        self.nodes_idx = dict(zip(nodes, range(len(nodes))))
+        self.g_t = self.g.reverse()
 
-        # Handle missing values in X
-        r_, c_ = np.where(np.isnan(self.X))
-        m = np.nanmean(self.X, axis=0)
-        for i, j in zip(r_, c_):
-            self.X[i, j] = m[j]
 
-    def load_data(self, csv_file, labels_json, hierarchy_json, is_GO, is_test):
+
+    def load_data(self, csv_file, hierarchy_json, is_go, is_test):
         """
         Load features and labels from CSV, and optionally a hierarchy graph from JSON.
         """
@@ -187,32 +220,21 @@ class Dataset:
         df['processed_features'] = df['features'].apply(process_features)
         X = np.stack(df['processed_features'].values)
 
-        # Load labels JSON
-        with open(labels_json, 'r') as f:
-            terms = json.load(f)
-
         # Labels (Y)
         def process_labels(labels):
             """
             Convert hierarchical labels to binary array.
             """
-            y = np.zeros(len(terms))
+            y = np.zeros(len(self.categories))
             for label in labels:
-                y[[terms.index(term) for term in label if term in terms]] = 1
+                y[[self.categories.index(term) for term in label if term in self.categories]] = 1
             return y
 
         df['binary_labels'] = df['categories'].apply(process_labels)
         Y = np.stack(df['binary_labels'].values)
 
-        # Load hierarchy JSON (optional)
-        if hierarchy_json:
-            with open(hierarchy_json, 'r') as f:
-                hierarchy = json.load(f)
-            g = nx.DiGraph(hierarchy)
-        else:
-            g = nx.DiGraph()
 
-        return X, Y, terms, g
+        return X, Y
 
 
 def initialize_dataset(name, fun_path, go_path):
@@ -220,8 +242,8 @@ def initialize_dataset(name, fun_path, go_path):
     Initialize train, validation, and test datasets.
     """
     datasets = load_dataset_paths(fun_path, go_path)
-    train_csv, valid_csv, test_csv, labels_json, hierarchy_json = datasets[name]
-    train_data = Dataset(train_csv, labels_json, hierarchy_json, is_GO=True)
-    val_data = Dataset(valid_csv, labels_json, hierarchy_json, is_GO=True)
-    test_data = Dataset(test_csv, labels_json, hierarchy_json, is_GO=True, is_test=True)
+    train_csv, valid_csv, test_csv, labels_json, _ = datasets[name]
+    train_data = Dataset(train_csv, labels_json, is_go=True)
+    val_data = Dataset(valid_csv, labels_json, is_go=True)
+    test_data = Dataset(test_csv, labels_json, is_go=True, is_test=True)
     return train_data, val_data, test_data
