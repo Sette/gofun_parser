@@ -4,7 +4,7 @@ import networkx as nx
 import pandas as pd
 import json
 import ast
-
+import keras
 # Nós que devem ser ignorados
 to_skip = ['root', 'GO0003674', 'GO0005575', 'GO0008150']
 
@@ -153,7 +153,7 @@ def load_dataset_paths(fun_path, go_path):
 
 
 class Dataset:
-    def __init__(self, csv_file, labels_json, is_go=False, is_test=False):
+    def __init__(self, csv_file, labels_json, is_go=False):
         """
         Initializes the dataset, loading features (X), labels (Y), and optionally the hierarchy graph.
         """
@@ -161,23 +161,27 @@ class Dataset:
         self.g = None
         self.nodes_idx = None
         self.g_t = None
+        self.df = None
         self.graph_path = labels_json.replace('-labels.json', '.graphml')
+        self.columns_path = labels_json.replace('-labels', '')
         self.load_structure(labels_json, is_go)
+        with open(self.columns_path, 'r') as f:
+            self.columns = json.load(f)
 
-        #self.X, self.Y = self.load_data(
-        #    csv_file, hierarchy_json, is_go, is_test
-        #)
-        #self.to_eval = [t not in to_skip for t in self.terms]
+        self.load_data(
+            csv_file, is_go
+        )
+        self.to_eval = [t not in to_skip for t in self.categories['labels']]
 
 
     def load_structure(self, labels_json, is_go):
         # Load labels JSON
         with open(labels_json, 'r') as f:
-            categories = json.load(f)
+            self.categories = json.load(f)
 
         self.g = nx.DiGraph()
 
-        for cat in categories['labels']:
+        for cat in self.categories['labels']:
             terms = cat.split('/')
             if is_go:
                 self.g.add_edge(terms[1], terms[0])
@@ -201,40 +205,36 @@ class Dataset:
 
 
 
-    def load_data(self, csv_file, hierarchy_json, is_go, is_test):
+    def load_data(self, csv_file, is_go):
         """
         Load features and labels from CSV, and optionally a hierarchy graph from JSON.
         """
         # Load CSV
-        df = pd.read_csv(csv_file)
+        self.df = pd.read_csv(csv_file)
 
-        df['features'] = df.features.apply(lambda x : ast.literal_eval(x))
+        self.df['features'] = self.df.features.apply(lambda x : ast.literal_eval(x))
+
+        def __process_feature(feature, idx):
+            if self.columns['type'][idx] == 'numeric' or self.columns['type'][idx] == 'NUMERIC':
+                if feature != '?':
+                    return float(feature)
+                else:
+                    return None
+            else:
+                cats = self.columns['type'][idx][1:-1].split(',')
+                cats_bin = {key:keras.utils.to_categorical(i, len(cats)).tolist() for i,key in enumerate(cats)}
+                return cats_bin.get(feature, [0.0]*len(cats))
 
         # Features (X)
         def process_features(features):
             """
             Convert features from string to a numerical array.
             """
-            return np.array([float(f) if f is not None and type(f) != str else f for f in features])
+            return [__process_feature(f, i) for i, f in enumerate(features)]
 
-        df['processed_features'] = df['features'].apply(process_features)
-        X = np.stack(df['processed_features'].values)
-
-        # Labels (Y)
-        def process_labels(labels):
-            """
-            Convert hierarchical labels to binary array.
-            """
-            y = np.zeros(len(self.categories))
-            for label in labels:
-                y[[self.categories.index(term) for term in label if term in self.categories]] = 1
-            return y
-
-        df['binary_labels'] = df['categories'].apply(process_labels)
-        Y = np.stack(df['binary_labels'].values)
+        self.df['processed_features'] = self.df['features'].apply(process_features)
 
 
-        return X, Y
 
 
 def initialize_dataset(name, fun_path, go_path):
@@ -245,5 +245,5 @@ def initialize_dataset(name, fun_path, go_path):
     train_csv, valid_csv, test_csv, labels_json, _ = datasets[name]
     train_data = Dataset(train_csv, labels_json, is_go=True)
     val_data = Dataset(valid_csv, labels_json, is_go=True)
-    test_data = Dataset(test_csv, labels_json, is_go=True, is_test=True)
+    test_data = Dataset(test_csv, labels_json, is_go=True)
     return train_data, val_data, test_data
