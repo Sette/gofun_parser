@@ -1,6 +1,10 @@
 import json
 import pandas as pd
 import os
+import keras
+from tqdm import tqdm
+
+tqdm.pandas()
 
 class GoFunCSVParser:
     def __init__(self, input_file, output_file):
@@ -84,6 +88,32 @@ class GoFunCSVParser:
     def transform_to_csv(self):
         df = pd.DataFrame(self.processed_lines)
         df.features = df.features.apply(lambda List: [None if x == '?' else x for x in List])
+        
+        # Parse to HMC format
+        df.categories = df.categories.apply(lambda x: x.replace('/', '.'))
+
+        def __process_feature(feature, idx):
+            if self.atributes_names['type'][idx] == 'numeric' or self.atributes_names['type'][idx] == 'NUMERIC':
+                if feature != '?' and feature is not None:
+                    return float(feature)
+                else:
+                    return None
+            else:
+                cats = self.atributes_names['type'][idx][1:-1].split(',')
+                cats_bin = {key: keras.utils.to_categorical(i, len(cats)).tolist() for i, key in enumerate(cats)}
+                return cats_bin.get(feature, [0.0] * len(cats))
+
+        # Features (X)
+        def process_features(features):
+            """
+            Convert features from string to a numerical array.
+            """
+            return [__process_feature(f, i) for i, f in enumerate(features)]
+
+
+        print(f"processing features {self.output_file}")
+        df['features'] = df['features'].progress_apply(process_features)
+
         # Save dataframe to CSV
         df.to_csv(self.output_file, index=False)
 
@@ -108,5 +138,6 @@ class GoFunCSVParser:
         
         self.load_data()
         self.preprocess()
+        print(f"call transform to csv {self.output_file}")
         self.transform_to_csv()
-        print(f"Data successfully converted and saved to {self.output_file}")
+
