@@ -47,7 +47,7 @@ class GoFunCSVParser:
             if line.startswith("@ATTRIBUTE class"):
                 # Parse attribute information after "@ATTRIBUTE class"
                 hierarchy_data = line.split(maxsplit=2)[2]
-                labels = hierarchy_data.strip().split(",")
+                labels = hierarchy_data.strip().replace('/', '.').split(",")
                 labels[0] = labels[0].split(' ')[1]
                 return {'labels': labels}
                 # Process only @ATTRIBUTE lines for potential issues
@@ -123,7 +123,7 @@ class GoFunCSVParser:
                 json.dump(self.labels, fp)
         else:
             print(f"The file '{self.output_labels_file}' already exists and will not be overwritten.")
-        
+
         # Check if the file already exists
         if not os.path.exists(self.output_atributes_file):
             with open(self.output_atributes_file, 'w') as fp:
